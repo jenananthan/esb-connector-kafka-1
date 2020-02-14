@@ -18,6 +18,11 @@
 
 package org.wso2.carbon.connector;
 
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.*;
 import org.apache.axiom.om.OMOutputFormat;
 import org.apache.axis2.AxisFault;
 import org.apache.axis2.transport.MessageFormatter;
@@ -36,10 +41,15 @@ import org.apache.synapse.mediators.Value;
 import org.wso2.carbon.connector.core.AbstractConnector;
 import org.wso2.carbon.connector.core.ConnectException;
 import org.wso2.carbon.connector.core.util.ConnectorUtils;
+import org.wso2.carbon.mediation.registry.WSO2Registry;
+import org.wso2.carbon.registry.api.RegistryException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -49,7 +59,7 @@ import java.util.concurrent.Future;
  * Produce the messages to the kafka brokers.
  */
 public class KafkaProduceConnector extends AbstractConnector {
-
+    private final EncoderFactory encoderFactory = EncoderFactory.get();
     public void connect(MessageContext messageContext) throws ConnectException {
 
         SynapseLog log = getLog(messageContext);
@@ -161,7 +171,14 @@ public class KafkaProduceConnector extends AbstractConnector {
             log.debug("Sending message with the following properties : Topic=" + topic + ", Partition Number=" +
                     partitionNumber + ", Key=" + key + ", Message=" + message + ", Headers=" + headers);
         }
-
+        boolean avroMode = (boolean)messageContext.getProperty("ENABLE_AVRO");
+        if(avroMode) {
+            try {
+                message = getAvroMessage(message, messageContext);
+            } catch (RegistryException | IOException e) {
+                handleException("Error while getting avro serialized message", e, messageContext);
+            }
+        }
         Future<RecordMetadata> metaData;
         metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, message, headers));
         messageContext.setProperty("topic", metaData.get().topic());
@@ -256,5 +273,39 @@ public class KafkaProduceConnector extends AbstractConnector {
      */
     private static String lookupTemplateParameter(MessageContext messageContext, String paramName) {
         return (String) ConnectorUtils.lookupTemplateParamater(messageContext, paramName);
+    }
+
+    private String getAvroMessage(String jsonMessage, MessageContext messageContext) throws RegistryException, IOException {
+        //Get avrom schema from wso2 registry
+        String avroSchema =  getSchema(messageContext);
+        Schema schema = new Schema.Parser().parse(avroSchema);
+        //Convert json message to genric record for serialization
+        JsonDecoder jsonDecoder = DecoderFactory.get().jsonDecoder(schema, jsonMessage);
+        DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
+        GenericRecord avroRecord = datumReader.read(null, jsonDecoder);
+
+        //Prepend schema ID
+        int schemaID = (int)messageContext.getProperty("AVRO_SCHEMA_ID");
+        final byte MAGIC_BYTE = 0x0;
+        final int idSize = 4;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(MAGIC_BYTE);
+        out.write(ByteBuffer.allocate(idSize).putInt(schemaID).array());
+
+        //Serialize the generic record
+        BinaryEncoder encoder = encoderFactory.directBinaryEncoder(out, null);
+        DatumWriter<Object>  writer = new GenericDatumWriter<>(schema);
+        writer.write(avroRecord, encoder);
+        encoder.flush();
+
+        byte[] bytes = out.toByteArray();
+        out.close();
+        return new String(bytes);
+    }
+
+    private  String getSchema(MessageContext messageContext) throws RegistryException {
+        String schemaLocation = (String) messageContext.getProperty("AVRO_SCHEMA_LOCATION");
+        return new String((byte[]) ((WSO2Registry)messageContext.getConfiguration().getRegistry())
+                .getResource(schemaLocation).getContent());
     }
 }
