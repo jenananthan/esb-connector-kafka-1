@@ -46,3 +46,42 @@ Follow the steps given below to build the Kafka connector from the source code:
 
 As an open source project, WSO2 extensions welcome contributions from the community.
 Check the [issue tracker](https://github.com/wso2-extensions/esb-connector-kafka/issues) for open issues that interest you. We look forward to receiving your contributions.
+
+
+## How to test Avro mode
+###Configure Schema Registry
+1. Setup confluent platform with schema registry locally https://docs.confluent.io/current/schema-registry/installation/index.html
+2. Navigate to the Control Center web interface at http://localhost:9021/.
+3. Create topic test-topic in using Center web interface
+4. Add sample schema to test-topic https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-userschema-json
+5. Download the schema and note down the schema id
+
+###Configure WSO2 EI
+1.Build and upload kafka connector
+2.Enable the kafka connector via carbon console
+3.Store the schema in registry location
+e.g location conf:/avroschema/userschema.json
+. Schema : https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-userschema-json
+
+##Configure Proxy
+Set below properties to use by kafka connector. Set the schemaID and schema registry location
+```
+<property name="ENABLE_AVRO" type="BOOLEAN" value="true"/>
+<property name="AVRO_SCHEMA_ID" type="INTEGER" value="2"/>
+<property name="AVRO_SCHEMA_LOCATION" value="conf:/avroschema/userschema.json"/>
+<property name="messageType" scope="axis2" value="application/json"/>
+```
+Sample Proxy: https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-customconnector-proxy-xml
+## Produce message
+```
+curl --location --request POST 'http://localhost:8280/services/CustomConnector' \
+--header 'Content-Type: application/json' \
+--data-raw '{"f1": "value"}'
+```
+
+## Consume message using confluent avro client
+```
+bin/kafka-avro-console-consumer --topic test-topic  --bootstrap-server localhost:9092
+```
+
+Avro client usage : https://docs.confluent.io/1.0.1/quickstart.html

@@ -173,6 +173,7 @@ public class KafkaProduceConnector extends AbstractConnector {
         }
         boolean avroMode = (boolean)messageContext.getProperty("ENABLE_AVRO");
         if(avroMode) {
+            log.info("Avro mode enabled.");
             try {
                 message = getAvroMessage(message, messageContext);
             } catch (RegistryException | IOException e) {
