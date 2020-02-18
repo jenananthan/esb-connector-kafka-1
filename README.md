@@ -57,9 +57,10 @@ Check the [issue tracker](https://github.com/wso2-extensions/esb-connector-kafka
 5. Download the schema and note down the schema id
 
 ### Configure WSO2 EI 6.2.0
-1.Build and upload kafka connector
-2.Enable the kafka connector via carbon console
-3.Store the schema in registry location
+1. Copy avro-1.9.1.jar to <EI>/libg
+2.Build and upload kafka connector
+3.Enable the kafka connector via carbon console
+4.Store the schema in registry location
 e.g location conf:/avroschema/userschema.json
 . Schema : https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-userschema-json
 
