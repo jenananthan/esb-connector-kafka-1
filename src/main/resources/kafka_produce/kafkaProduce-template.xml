@@ -21,6 +21,12 @@
     <parameter name="topic" description="maintains feeds of messages in categories"/>
     <parameter name="message" description="the messages can be xml or json message"/>
     <parameter name="partitionNo" description="The value of the partition Number"/>
+    <parameter name="enableAvro" description="Configure kafka to publish avro message"/>
+    <parameter name="keyMessage" description="Key value"/>
+    <parameter name="keySchemaID" description="Value of Avro schema ID of key message"/>
+    <parameter name="keySchemaLocation" description="Registry location of key Avro Schema"/>
+    <parameter name="valueSchemaID" description="Value of Avro schema ID of value message"/>
+    <parameter name="valueSchemaLocation" description="Registry location of value Avro Schema"/>
     <sequence>
         <class name="org.wso2.carbon.connector.KafkaProduceConnector"/>
     </sequence>

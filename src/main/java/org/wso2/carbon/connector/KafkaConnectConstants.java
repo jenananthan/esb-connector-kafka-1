@@ -170,4 +170,11 @@ public class KafkaConnectConstants {
     // Maximum default connection pool size
     public static final String DEFAULT_CONNECTION_POOL_MAX_SIZE = "-1";
 
+    public static final String KEY_SCHEMA = "keySchemaLocation";
+    public static final String KEY_SCHEMA_ID = "keySchemaID";
+    public static final String VALUE_SCHEMA = "valueSchemaLocation";
+    public static final String VALUE_SCHEMA_ID = "valueSchemaID";
+    public static final String KEY_MESSAGE = "keyMessage";
+    public static final String ENABLE_AVRO_KEY = "enableAvroKey";
+    public static final String ENABLE_AVRO_VALUE = "enableAvroValue";
 }

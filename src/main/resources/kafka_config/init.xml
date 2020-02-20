@@ -123,7 +123,13 @@
                manager factory algorithm configured for the Java Virtual Machine."/>
     <parameter name="maxPoolSize"
                description="The connection pool maximum size"/>
+    <parameter name="enableAvroKey"
+               description="Enable avro serialization for Key"/>
+    <parameter name="enableAvroValue"
+               description="Enable avro serialization for value"/>
     <sequence>
+        <property expression="$func:enableAvroKey" name="enableAvroKey" type="STRING"/>
+        <property expression="$func:enableAvroValue" name="enableAvroValue" type="STRING"/>
         <property expression="$func:bootstrapServers" name="kafka.bootstrapServers"
                   scope="operation" type="STRING"/>
         <property expression="$func:keySerializerClass" name="kafka.keySerializerClass"/>
