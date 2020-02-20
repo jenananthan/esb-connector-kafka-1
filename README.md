@@ -49,21 +49,22 @@ Check the [issue tracker](https://github.com/wso2-extensions/esb-connector-kafka
 
 
 ## How to test Avro mode
-###Configure Schema Registry
+### Configure Schema Registry
 1. Setup confluent platform with schema registry locally https://docs.confluent.io/current/schema-registry/installation/index.html
 2. Navigate to the Control Center web interface at http://localhost:9021/.
 3. Create topic test-topic in using Center web interface
 4. Add sample schema to test-topic https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-userschema-json
 5. Download the schema and note down the schema id
 
-###Configure WSO2 EI
-1.Build and upload kafka connector
-2.Enable the kafka connector via carbon console
-3.Store the schema in registry location
+### Configure WSO2 EI 6.2.0
+1. Copy avro-1.9.1.jar to <EI>/libg
+2.Build and upload kafka connector
+3.Enable the kafka connector via carbon console
+4.Store the schema in registry location
 e.g location conf:/avroschema/userschema.json
 . Schema : https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-userschema-json
 
-##Configure Proxy
+### Configure Proxy
 Set below properties to use by kafka connector. Set the schemaID and schema registry location
 ```
 <property name="ENABLE_AVRO" type="BOOLEAN" value="true"/>
@@ -72,14 +73,14 @@ Set below properties to use by kafka connector. Set the schemaID and schema regi
 <property name="messageType" scope="axis2" value="application/json"/>
 ```
 Sample Proxy: https://gist.github.com/jenananthan/994df1cc09d12b78ea2ebca50a7503f4#file-customconnector-proxy-xml
-## Produce message
+### Produce message
 ```
 curl --location --request POST 'http://localhost:8280/services/CustomConnector' \
 --header 'Content-Type: application/json' \
 --data-raw '{"f1": "value"}'
 ```
 
-## Consume message using confluent avro client
+### Consume message using confluent avro client
 ```
 bin/kafka-avro-console-consumer --topic test-topic  --bootstrap-server localhost:9092
 ```
