@@ -41,7 +41,7 @@ public class KafkaConnection {
      * @param messageContext the message context.
      * @return the producer
      */
-    public KafkaProducer<String, String> createNewConnection(MessageContext messageContext) {
+    public KafkaProducer createNewConnection(MessageContext messageContext) {
         Axis2MessageContext axis2mc = (Axis2MessageContext) messageContext;
         String brokers = (String) axis2mc.getAxis2MessageContext()
                 .getProperty(KafkaConnectConstants.KAFKA_BROKER_LIST);

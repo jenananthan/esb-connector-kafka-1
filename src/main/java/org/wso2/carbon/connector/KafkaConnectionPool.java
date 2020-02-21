@@ -31,7 +31,7 @@ import java.util.Vector;
 public class KafkaConnectionPool {
     private static Log log = LogFactory.getLog(KafkaConnectionPool.class);
 
-    private static Vector<KafkaProducer<String, String>> connectionPool = new Vector<>();
+    private static Vector<KafkaProducer> connectionPool = new Vector<>();
 
     /**
      * Initialize the connection pool.
@@ -82,7 +82,7 @@ public class KafkaConnectionPool {
      *
      * @return the connection.
      */
-    public static synchronized KafkaProducer<String, String> getConnectionFromPool() {
+    public static synchronized KafkaProducer getConnectionFromPool() {
 
         if (log.isDebugEnabled()) {
             log.debug("Get the Kafka connection from the connection pool");
@@ -101,7 +101,7 @@ public class KafkaConnectionPool {
      *
      * @param connection the connection.
      */
-    public static synchronized void returnConnectionToPool(KafkaProducer<String, String> connection) {
+    public static synchronized void returnConnectionToPool(KafkaProducer connection) {
         if (log.isDebugEnabled()) {
             log.debug("Return the Kafka connection to the connection pool");
         }

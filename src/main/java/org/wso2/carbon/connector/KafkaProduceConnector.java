@@ -34,6 +34,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.SynapseLog;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
@@ -157,7 +158,7 @@ public class KafkaProduceConnector extends AbstractConnector {
      * @param message     The message that send to kafka broker.
      * @param headers     The kafka headers
      */
-    private void send(KafkaProducer<String, String> producer, String topic, String partitionNo, String key,
+    private void send(KafkaProducer producer, String topic, String partitionNo, String key,
                       String message, org.apache.kafka.common.header.Headers headers, MessageContext messageContext)
             throws ExecutionException, InterruptedException {
 
@@ -174,29 +175,35 @@ public class KafkaProduceConnector extends AbstractConnector {
             log.debug("Sending message with the following properties : Topic=" + topic + ", Partition Number=" +
                     partitionNumber + ", Key=" + key + ", Message=" + message + ", Headers=" + headers);
         }
+        Future<RecordMetadata> metaData = null;
         boolean isAvroKey = Boolean.parseBoolean((String)messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO_KEY));
         boolean isAvroValue = Boolean.parseBoolean((String)messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO_VALUE));
-        if(isAvroKey) {
-            log.debug("Avro mode enabled for key");
+
+        if(isAvroKey && isAvroValue) {
+            log.debug("Avro mode enabled for key and value");
             try {
                 log.debug("Serialize Key");
-                key = getAvroMessage(key, messageContext, true);
+                Bytes keyAvro = getAvroMessage(key, messageContext, true);
+                Bytes messageAvro  = getAvroMessage(message, messageContext, false);
+                metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, keyAvro, messageAvro, headers));
             } catch (RegistryException | IOException e) {
-                handleException("Error while getting avro serialized key message : " + key, e, messageContext);
+                handleException("Error while getting avro serialized  message : " + key, e, messageContext);
             }
-        }
-        if(isAvroValue) {
-            log.debug("Avro mode enabled enable for value");
+        } else if (!isAvroKey && isAvroValue) {
+            log.debug("Avro mode enabled for value");
             try {
-                log.debug("Serialize value");
-                message = getAvroMessage(message, messageContext, false);
+                Bytes messageAvro  = getAvroMessage(message, messageContext, false);
+                metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, messageAvro, headers));
             } catch (RegistryException | IOException e) {
-                handleException("Error while getting avro serialized value message : " + message, e, messageContext);
+                handleException("Error while getting avro serialized  message : " + key, e, messageContext);
             }
+        } else {
+            metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, message, headers));
         }
-        log.debug(String.format("Publishing message. Topic: %s . Key Message: %s. Value Message: %s",topic, key, message));
-        Future<RecordMetadata> metaData;
-        metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, message, headers));
+
+
+
+
         messageContext.setProperty("topic", metaData.get().topic());
         messageContext.setProperty("offset", metaData.get().offset());
         messageContext.setProperty("partition", metaData.get().partition());
@@ -222,7 +229,7 @@ public class KafkaProduceConnector extends AbstractConnector {
                               String message, org.apache.kafka.common.header.Headers headers)
             throws ConnectException {
 
-        KafkaProducer<String, String> producer = KafkaConnectionPool.getConnectionFromPool();
+        KafkaProducer producer = KafkaConnectionPool.getConnectionFromPool();
         if (producer == null) {
             KafkaConnectionPool.initialize(messageContext);
         }
@@ -264,7 +271,7 @@ public class KafkaProduceConnector extends AbstractConnector {
                                  String message, org.apache.kafka.common.header.Headers headers)
             throws ConnectException {
         KafkaConnection kafkaConnection = new KafkaConnection();
-        KafkaProducer<String, String> producer = kafkaConnection.createNewConnection(messageContext);
+        KafkaProducer producer = kafkaConnection.createNewConnection(messageContext);
 
         if (log.isDebugEnabled()) {
             log.debug("Sending message to broker list WITHOUT connection pool");
@@ -291,7 +298,7 @@ public class KafkaProduceConnector extends AbstractConnector {
         return (String) ConnectorUtils.lookupTemplateParamater(messageContext, paramName);
     }
 
-    private String getAvroMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
+    private Bytes getAvroMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
         log.debug("Get avro message");
         //Get avrom schema from wso2 registry
         String avroSchema =  getSchema(messageContext, isKey);
@@ -317,7 +324,7 @@ public class KafkaProduceConnector extends AbstractConnector {
 
         byte[] bytes = out.toByteArray();
         out.close();
-        return new String(bytes);
+        return new Bytes(bytes);
     }
 
     private int getSchemaID(MessageContext messageContext, boolean isKey)  {
