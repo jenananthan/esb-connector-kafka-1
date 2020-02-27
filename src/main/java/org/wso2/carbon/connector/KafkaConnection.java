@@ -133,6 +133,8 @@ public class KafkaConnection {
                 .getProperty(KafkaConnectConstants.KAFKA_SSL_SECURE_RANDOM_IMPLEMENTATION);
         String sslTrustmanagerAlgorithm = (String) messageContext
                 .getProperty(KafkaConnectConstants.KAFKA_SSL_TRUSTMANAGER_ALGORITHM);
+        String schemaRegistryUrl = (String) messageContext
+                .getProperty(KafkaConnectConstants.SCHEMA_REG_URL);
 
         Properties producerConfigProperties = new Properties();
         producerConfigProperties.put(KafkaConnectConstants.BROKER_LIST, brokers);
@@ -226,6 +228,8 @@ public class KafkaConnection {
         producerConfigProperties.put(KafkaConnectConstants.METRICS_SAMPLE_WINDOW, metricsSampleWindow);
         producerConfigProperties.put(KafkaConnectConstants.RECONNECT_BACKOFF_TIME, reconnectBackoffTime);
         producerConfigProperties.put(KafkaConnectConstants.RETRY_BACKOFF_TIME, retryBackoffTime);
+        producerConfigProperties.put(KafkaConnectConstants.AUTO_REGISTER_SCHEMAS, KafkaConnectConstants.AUTO_REGISTER_SCHEMAS_DEFAULT);
+        producerConfigProperties.put(KafkaConnectConstants.SCHEMA_REG_URL, schemaRegistryUrl);
 
         if (StringUtils.isNotEmpty(saslKerberosKinitCmd)) {
             producerConfigProperties.put(KafkaConnectConstants.SASL_KERBEROS_KINIT_CMD, saslKerberosKinitCmd);

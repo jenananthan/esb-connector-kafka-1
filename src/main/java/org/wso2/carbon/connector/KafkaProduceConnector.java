@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -73,8 +72,11 @@ public class KafkaProduceConnector extends AbstractConnector {
             String topic = lookupTemplateParameter(messageContext, KafkaConnectConstants.PARAM_TOPIC);
             //Generate the key.
             String key = lookupTemplateParameter(messageContext, KafkaConnectConstants.KEY_MESSAGE);
-            if(StringUtils.isEmpty(key)) {
+            if (StringUtils.isEmpty(key)) {
                 key = String.valueOf(UUID.randomUUID());
+                if (super.log.isDebugEnabled()) {
+                    super.log.debug("Key is not provided, generate random key : " + key);
+                }
             }
             //Read the partition No from the parameter
             String partitionNo = lookupTemplateParameter(messageContext, KafkaConnectConstants.PARTITION_NO);
@@ -175,34 +177,41 @@ public class KafkaProduceConnector extends AbstractConnector {
             log.debug("Sending message with the following properties : Topic=" + topic + ", Partition Number=" +
                     partitionNumber + ", Key=" + key + ", Message=" + message + ", Headers=" + headers);
         }
-        Future<RecordMetadata> metaData = null;
-        boolean isAvroKey = Boolean.parseBoolean((String)messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO_KEY));
-        boolean isAvroValue = Boolean.parseBoolean((String)messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO_VALUE));
 
-        if(isAvroKey && isAvroValue) {
-            log.debug("Avro mode enabled for key and value");
-            try {
-                log.debug("Serialize Key");
-                Bytes keyAvro = getAvroMessage(key, messageContext, true);
-                Bytes messageAvro  = getAvroMessage(message, messageContext, false);
-                metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, keyAvro, messageAvro, headers));
-            } catch (RegistryException | IOException e) {
-                handleException("Error while getting avro serialized  message : " + key, e, messageContext);
+        Future<RecordMetadata> metaData = null;
+        boolean enableAvro = Boolean.parseBoolean((String) messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO));
+        if (enableAvro) {
+            if (log.isDebugEnabled()) {
+                log.debug("Avro serialization enabled for key and value");
             }
-        } else if (!isAvroKey && isAvroValue) {
-            log.debug("Avro mode enabled for value");
-            try {
-                Bytes messageAvro  = getAvroMessage(message, messageContext, false);
-                metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, messageAvro, headers));
-            } catch (RegistryException | IOException e) {
-                handleException("Error while getting avro serialized  message : " + key, e, messageContext);
+            String schemaRegistryURL = (String) messageContext.getProperty(KafkaConnectConstants.SCHEMA_REG_URL);
+            if (StringUtils.isNotEmpty(schemaRegistryURL)) {// Serialization using schema registry(Schema ID from registry)
+                if (log.isDebugEnabled()) {
+                    log.debug("Serialization using schema registry(Schema ID from registry). Registry URL : " + schemaRegistryURL);
+                }
+                try {
+                    GenericRecord keyAvro = getAvroMessage(key, messageContext, true);
+                    GenericRecord messageAvro = getAvroMessage(message, messageContext, false);
+                    metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, keyAvro, messageAvro, headers));
+
+                } catch (RegistryException | IOException e) {
+                    handleException("Error while getting generic record for avro serialization : " + key, e, messageContext);
+                }
+            } else { // Serialization using provided schema ID
+                if (log.isDebugEnabled()) {
+                    log.debug("Serialization using provided schema ID");
+                }
+                try {
+                    Bytes keyAvro = getAvroSerializedMessage(key, messageContext, true);
+                    Bytes messageAvro = getAvroSerializedMessage(message, messageContext, false);
+                    metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, keyAvro, messageAvro, headers));
+                } catch (RegistryException | IOException e) {
+                    handleException("Error while getting Avro serialized  message : " + key, e, messageContext);
+                }
             }
         } else {
             metaData = producer.send(new ProducerRecord<>(topic, partitionNumber, key, message, headers));
         }
-
-
-
 
         messageContext.setProperty("topic", metaData.get().topic());
         messageContext.setProperty("offset", metaData.get().offset());
@@ -298,10 +307,21 @@ public class KafkaProduceConnector extends AbstractConnector {
         return (String) ConnectorUtils.lookupTemplateParamater(messageContext, paramName);
     }
 
-    private Bytes getAvroMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
-        log.debug("Get avro message");
+    private GenericRecord getAvroMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
         //Get avrom schema from wso2 registry
-        String avroSchema =  getSchema(messageContext, isKey);
+        String avroSchema = getSchema(messageContext, isKey);
+        Schema schema = new Schema.Parser().parse(avroSchema);
+        //Convert json message to generic record for serialization
+        JsonDecoder jsonDecoder = DecoderFactory.get().jsonDecoder(schema, jsonMessage);
+        DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>(schema);
+        GenericRecord avroRecord = datumReader.read(null, jsonDecoder);
+        return avroRecord;
+    }
+
+    private Bytes getAvroSerializedMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
+        log.debug("Serialize the message. isKey= " + isKey + ". Message :" + jsonMessage);
+        //Get avrom schema from wso2 registry
+        String avroSchema = getSchema(messageContext, isKey);
         Schema schema = new Schema.Parser().parse(avroSchema);
         //Convert json message to generic record for serialization
         JsonDecoder jsonDecoder = DecoderFactory.get().jsonDecoder(schema, jsonMessage);
@@ -309,7 +329,7 @@ public class KafkaProduceConnector extends AbstractConnector {
         GenericRecord avroRecord = datumReader.read(null, jsonDecoder);
         //Prepend schema ID
         int schemaID = getSchemaID(messageContext, isKey);
-        log.debug(String.format("Start avro serialization. Schema: %s . Schema ID: %s. Message : %s.",avroSchema, schemaID, messageContext));
+        log.debug(String.format("Start Avro serialization. Schema: %s . Schema ID: %s.", avroSchema, schemaID));
         final byte MAGIC_BYTE = 0x0;
         final int idSize = 4;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -318,7 +338,7 @@ public class KafkaProduceConnector extends AbstractConnector {
 
         //Serialize the generic record
         BinaryEncoder encoder = encoderFactory.directBinaryEncoder(out, null);
-        DatumWriter<Object>  writer = new GenericDatumWriter<>(schema);
+        DatumWriter<Object> writer = new GenericDatumWriter<>(schema);
         writer.write(avroRecord, encoder);
         encoder.flush();
 
@@ -327,24 +347,30 @@ public class KafkaProduceConnector extends AbstractConnector {
         return new Bytes(bytes);
     }
 
-    private int getSchemaID(MessageContext messageContext, boolean isKey)  {
+    private int getSchemaID(MessageContext messageContext, boolean isKey) {
         String schemaID;
-        if(isKey) {
+        if (isKey) {
             schemaID = lookupTemplateParameter(messageContext, KafkaConnectConstants.KEY_SCHEMA_ID);
         } else {
             schemaID = lookupTemplateParameter(messageContext, KafkaConnectConstants.VALUE_SCHEMA_ID);
         }
+        if (log.isDebugEnabled()) {
+            log.debug("Provided schema ID : " + schemaID + ". isKey =" + isKey);
+        }
         return Integer.parseInt(schemaID);
     }
 
-    private  String getSchema(MessageContext messageContext, boolean isKey) throws RegistryException {
+    private String getSchema(MessageContext messageContext, boolean isKey) throws RegistryException {
         String schemaLocation;
-        if(isKey) {
+        if (isKey) {
             schemaLocation = lookupTemplateParameter(messageContext, KafkaConnectConstants.KEY_SCHEMA);
         } else {
             schemaLocation = lookupTemplateParameter(messageContext, KafkaConnectConstants.VALUE_SCHEMA);
         }
-        return new String((byte[]) ((WSO2Registry)messageContext.getConfiguration().getRegistry())
+        if (log.isDebugEnabled()) {
+            log.debug("Read schema from schema location : " + schemaLocation + ". isKey =" + isKey);
+        }
+        return new String((byte[]) ((WSO2Registry) messageContext.getConfiguration().getRegistry())
                 .getResource(schemaLocation).getContent());
     }
 }

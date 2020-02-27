@@ -77,6 +77,16 @@ public class KafkaConfigConnector extends AbstractConnector {
                     .getProperty(KafkaConnectConstants.KAFKA_RECONNECT_BACKOFF_TIME);
             String retryBackoffTime = (String) messageContext
                     .getProperty(KafkaConnectConstants.KAFKA_RETRY_BACKOFF_TIME);
+            String enableAvroKey = (String) messageContext.getProperty(KafkaConnectConstants.ENABLE_AVRO);
+            String schemaURL = (String) messageContext.getProperty(KafkaConnectConstants.SCHEMA_REG_URL);
+
+            if (StringUtils.isEmpty(enableAvroKey)) {
+                messageContext.setProperty(KafkaConnectConstants.ENABLE_AVRO, "false");
+            }
+
+            if (StringUtils.isEmpty(schemaURL)) {
+                messageContext.setProperty(KafkaConnectConstants.SCHEMA_REG_URL, "");
+            }
 
             if (StringUtils.isEmpty(ack)) {
                 messageContext.setProperty(KafkaConnectConstants.KAFKA_ACKS,

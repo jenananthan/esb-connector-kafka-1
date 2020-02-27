@@ -175,6 +175,8 @@ public class KafkaConnectConstants {
     public static final String VALUE_SCHEMA = "valueSchemaLocation";
     public static final String VALUE_SCHEMA_ID = "valueSchemaID";
     public static final String KEY_MESSAGE = "keyMessage";
-    public static final String ENABLE_AVRO_KEY = "enableAvroKey";
-    public static final String ENABLE_AVRO_VALUE = "enableAvroValue";
+    public static final String ENABLE_AVRO = "enableAvro";
+    public static final String SCHEMA_REG_URL = "schema.registry.url";
+    public static final String AUTO_REGISTER_SCHEMAS = "auto.register.schemas";
+    public static final String AUTO_REGISTER_SCHEMAS_DEFAULT = "false";
 }
