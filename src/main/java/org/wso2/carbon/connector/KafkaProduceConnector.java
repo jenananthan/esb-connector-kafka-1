@@ -307,6 +307,16 @@ public class KafkaProduceConnector extends AbstractConnector {
         return (String) ConnectorUtils.lookupTemplateParamater(messageContext, paramName);
     }
 
+    /**
+     * This method is used to convert the json message in to generic record according to the avro schema. Avro schema
+     * is stored in wso2 registry and message context contains schema location in a property.
+     * @param jsonMessage Message to convert
+     * @param messageContext
+     * @param isKey true/false. Used to determine message type (key/value)
+     * @return GenericRecord
+     * @throws RegistryException
+     * @throws IOException
+     */
     private GenericRecord getAvroMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
         //Get avrom schema from wso2 registry
         String avroSchema = getSchema(messageContext, isKey);
@@ -318,6 +328,16 @@ public class KafkaProduceConnector extends AbstractConnector {
         return avroRecord;
     }
 
+    /**
+     * This method is used to serialize the message using avro serialization when schema id and schema provided(no schema registry used).
+     * Avro schema is stored in wso2 registry and message context contains schema location in a property.
+     * @param jsonMessage Message to serialize
+     * @param messageContext
+     * @param isKey true/false. Used to determine message type (key/value)
+     * @return Serialized message in bytes
+     * @throws RegistryException
+     * @throws IOException
+     */
     private Bytes getAvroSerializedMessage(String jsonMessage, MessageContext messageContext, boolean isKey) throws RegistryException, IOException {
         log.debug("Serialize the message. isKey= " + isKey + ". Message :" + jsonMessage);
         //Get avrom schema from wso2 registry
